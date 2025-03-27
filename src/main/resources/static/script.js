@@ -10,10 +10,10 @@ document.addEventListener("DOMContentLoaded", function () {
 });
 
 function fetchQuestions() {
-    fetch("http://localhost:8080/quiz/questions") // Update URL if needed
+    fetch("https://innovativeacademy.online/quiz/questions") // Update URL if needed
         .then(response => response.json())
         .then(data => {
-             questions = shuffleArray(data).slice(0, 5); // Shuffle and select 50 questions
+             questions = shuffleArray(data).slice(0, 50); // Shuffle and select 50 questions
             showQuestion();
         })
         .catch(error => console.error("Error fetching questions:", error));
