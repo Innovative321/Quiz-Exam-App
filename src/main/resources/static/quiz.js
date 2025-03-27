@@ -5,7 +5,7 @@ let reviewQuestions = {};
 
 // Fetch questions from the backend
 document.addEventListener("DOMContentLoaded", function () {
-    fetch("http://localhost:8080/quiz/questions")
+    fetch("https://innovativeacademy.online/quiz/questions")
         .then(response => response.json())
         .then(data => {
             questions = data;
