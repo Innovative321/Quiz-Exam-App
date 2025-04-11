@@ -8,12 +8,6 @@ import ia.quizapp.repo.UserRepository;
 import ia.quizapp.service.UserService;
 import jakarta.validation.Valid;
 import java.util.*;
-import jakarta.validation.constraints.Email;
-import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.Pattern;
-import jakarta.validation.constraints.Size;
-import jakarta.validation.Valid;
-
 
 @RestController
 @RequestMapping("/user")  // Ensure separate endpoints for user-related actions
