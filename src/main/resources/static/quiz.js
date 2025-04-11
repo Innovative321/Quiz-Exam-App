@@ -7,18 +7,7 @@ let totalTime = 60 * 60; // 60 minutes in seconds
 let testStarted = localStorage.getItem("testStarted") === "false";
 
 document.addEventListener("DOMContentLoaded", function () {
-<<<<<<< Updated upstream
-    fetch("https://innovativeacademy.online/quiz/questions")
-        .then(response => response.json())
-        .then(data => {
-            questions = data;
-            showQuestion();
-        })
-        .catch(error => console.error("Error fetching questions:", error));
-});
-=======
     const testStartedFlag = localStorage.getItem("testStarted");
->>>>>>> Stashed changes
 
 	if (testStartedFlag === "false" || testStartedFlag === null) {
 	       resetTestData();
