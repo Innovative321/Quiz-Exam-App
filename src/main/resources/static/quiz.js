@@ -8,6 +8,8 @@ let testStarted = localStorage.getItem("testStarted") === "false";
 
 document.addEventListener("DOMContentLoaded", function () {
     const testStartedFlag = localStorage.getItem("testStarted");
+	
+	console.log(testStartedFlag)
 
 	if (testStartedFlag === "false" || testStartedFlag === null) {
 	       resetTestData();
@@ -36,8 +38,6 @@ document.addEventListener("DOMContentLoaded", function () {
         fetchQuestions();
     }
 });
-
-
 
 function fetchQuestions() {
 
@@ -90,7 +90,16 @@ function showQuestion() {
 	        return;
 	    }
 
-	    document.getElementById("question").innerText = `${currentQuestionIndex + 1}. ${questionData.question}`;
+		let questionText = `${currentQuestionIndex + 1}. ${questionData.question}`;
+		if (questionData.multipleChoice) {
+		    const requiredCount = questionData.correctAnswers.split(",").length;
+			const note = document.createElement("p");
+		    note.style.fontWeight = "bold";
+		    note.style.fontSize = "15px";
+		    questionText += ` (Select ${requiredCount})`;
+		}
+		document.getElementById("question").innerText = questionText;
+	    //document.getElementById("question").innerText = `${currentQuestionIndex + 1}. ${questionData.question}`;
 		//currentQuestionIndex++;
 	   // localStorage.setItem("currentQuestionIndex", currentQuestionIndex);
 		
@@ -177,15 +186,19 @@ function handleCheckboxSelection(inputName, maxSelectable, questionId, inputType
 }
 
 function resetTestData() {
-    console.log("Resetting test data...");
+	    console.log("Resetting test data...");
+	
+		// Clear stored responses, review data, and timer
+	    localStorage.removeItem("userResponses");
+	    localStorage.removeItem("reviewQuestions");
+	    localStorage.removeItem("quizQuestions");
+	    localStorage.removeItem("redirectToQuestion");
+	    localStorage.removeItem("remainingTime"); // ✅ Reset timer
+	    localStorage.setItem("testStarted", "false"); // Optional: ensure clean restart
 
-    // Clear stored responses and review data
-    localStorage.removeItem("userResponses");
-    localStorage.removeItem("reviewQuestions");
-
-    // Reset objects in memory
-    userResponses = {};
-    reviewQuestions = {};
+		// Reset objects in memory
+		userResponses = {};
+		reviewQuestions = {};
 }
 
 function startTest() {
