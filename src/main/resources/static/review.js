@@ -1,5 +1,40 @@
-let totalTime = parseInt(localStorage.getItem("remainingTime")) || 3600; // 60 mins default
+let totalTime = parseInt(localStorage.getItem("remainingTime")) || 3600;
 let timerInterval;
+let reviewQuestions = [];
+let allQuestions = [];
+let filteredQuestions = [];
+let userResponses = JSON.parse(localStorage.getItem("userResponses") || "{}");
+let currentReviewIndex = 0;
+
+document.addEventListener("DOMContentLoaded", () => {
+    startReviewTimer();
+    allQuestions = JSON.parse(localStorage.getItem("quizQuestions") || "[]");
+    reviewQuestions = Object.values(JSON.parse(localStorage.getItem("reviewQuestions") || "{}"));
+
+    if (allQuestions.length === 0) {
+        document.getElementById("reviewContainer").innerHTML = "<p>No questions available.</p>";
+        document.querySelector(".btn-success").style.display = "none";
+        return;
+    }
+    setupSwitchFilters();
+    applyFilters();
+    setupButtons();
+}); 
+
+function startReviewTimer() {
+    clearInterval(timerInterval);
+    updateTimerDisplay();
+    timerInterval = setInterval(() => {
+        totalTime--;
+        localStorage.setItem("remainingTime", totalTime);
+        updateTimerDisplay();
+        if (totalTime <= 0) {
+            clearInterval(timerInterval);
+            Swal.fire("Time's up!", "Your quiz will be submitted automatically.", "warning")
+                .then(() => submitQuiz());
+        }
+    }, 1000);
+}
 
 function updateTimerDisplay() {
     const timerElement = document.querySelector(".timer");
@@ -10,172 +45,184 @@ function updateTimerDisplay() {
     }
 }
 
-function startReviewTimer() {
-    clearInterval(timerInterval); // prevent multiple intervals
-    updateTimerDisplay(); // Initial display
-    timerInterval = setInterval(() => {
-        totalTime--;
-        localStorage.setItem("remainingTime", totalTime);
-        updateTimerDisplay();
+function applyFilters() {
+    const markedSwitch = document.getElementById("markedSwitch").checked;
+    const unansweredSwitch = document.getElementById("unansweredSwitch").checked;
 
-        if (totalTime <= 0) {
-            clearInterval(timerInterval);
-            Swal.fire("Time's up!", "Your quiz will be submitted automatically.", "warning")
-                .then(() => {
-                    submitQuiz(); // Auto submit when time runs out
-                });
-        }
-    }, 1000);
+    const markedIds = new Set(reviewQuestions.map(q => q.id));
+    const unansweredQuestions = allQuestions.filter(q => isUnanswered(q.id));
+    const markedQuestions = allQuestions.filter(q => markedIds.has(q.id));
+
+    if (markedSwitch && unansweredSwitch) {
+        // Show union of marked and unanswered questions
+        const combinedMap = new Map();
+        [...markedQuestions, ...unansweredQuestions].forEach(q => {
+            combinedMap.set(q.id, q); // Avoid duplicates by ID
+        });
+        filteredQuestions = Array.from(combinedMap.values());
+    } else if (markedSwitch) {
+        filteredQuestions = markedQuestions;
+    } else if (unansweredSwitch) {
+        filteredQuestions = unansweredQuestions;
+    } else {
+        filteredQuestions = allQuestions;
+    }
+
+    currentReviewIndex = 0;
+
+    if (filteredQuestions.length === 0) {
+        document.getElementById("reviewContainer").innerHTML = "<p>No matching questions to review.</p>";
+    } else {
+        showReviewQuestion();
+    }
 }
 
-document.addEventListener("DOMContentLoaded", function () {
-	startReviewTimer();
-    let reviewContainer = document.getElementById("reviewContainer");
-    if (!reviewContainer) {
-        console.error("Error: 'reviewContainer' not found.");
-        return;
-    }
+function isUnanswered(questionId) {
+    const response = userResponses[questionId];
+    return (
+        response === undefined ||
+        (Array.isArray(response) ? response.length === 0 : response === "")
+    );
+}
 
-    let storedData = localStorage.getItem("reviewQuestions");
-    let reviewQuestions = JSON.parse(storedData) || {};
-    let userResponses = JSON.parse(localStorage.getItem("userResponses") || "{}");
+function showReviewQuestion() {
+    const container = document.getElementById("reviewContainer");
+    container.innerHTML = "";
 
-    if (Object.keys(reviewQuestions).length === 0) {
-        reviewContainer.innerHTML = "<p>No questions marked for review.</p>";
-        return;
-    }
+    if (filteredQuestions.length === 0) return;
 
-    Object.values(reviewQuestions).forEach((question, index) => {
-        if (!question || typeof question !== "object" || !question.question) {
-            console.error("Skipping invalid question:", question);
-            return;
-        }
+    const question = filteredQuestions[currentReviewIndex];
+    const inputType = question.multipleChoice ? "checkbox" : "radio";
+    const inputName = `question_${question.id}`;
+    let selected = userResponses[question.id] || [];
 
-        let div = document.createElement("div");
-        div.classList.add("mb-3");
+    if (!Array.isArray(selected)) selected = [selected];
 
-        let questionTitle = document.createElement("h4");
-        questionTitle.innerText = `${index + 1}. ${question.question}`;
-        div.appendChild(questionTitle);
+    const questionTitle = document.createElement("h4");
+    questionTitle.innerText = `${currentReviewIndex + 1}. ${question.question}`;
+    container.appendChild(questionTitle);
 
-        let inputType = question.multipleChoice ? "checkbox" : "radio";
-        let selectedAnswers = userResponses[question.id] || [];
+    ["option1", "option2", "option3", "option4"].forEach(optionKey => {
+        if (!question[optionKey]) return;
 
-        if (!Array.isArray(selectedAnswers)) {
-            selectedAnswers = selectedAnswers ? [selectedAnswers] : [];
-        }
+        const optionDiv = document.createElement("div");
+        optionDiv.classList.add("form-check");
 
-        ["option1", "option2", "option3", "option4"].forEach(optionKey => {
-            if (!question[optionKey]) return;
+        const input = document.createElement("input");
+        input.type = inputType;
+        input.name = inputType === "radio" ? inputName : `${inputName}[]`;
+        input.value = question[optionKey];
+        input.classList.add("form-check-input");
+        input.checked = selected.includes(question[optionKey]);
 
-            let optionDiv = document.createElement("div");
-            optionDiv.classList.add("form-check");
-
-            let input = document.createElement("input");
-            input.type = inputType;
-            input.name = `question_${question.id}`;
-            input.value = question[optionKey];
-            input.classList.add("form-check-input");
-
-            // Restore selected answers
-            input.checked = selectedAnswers.includes(question[optionKey]);
-
-            input.addEventListener("change", function () {
-                updateUserResponse(question.id, question.multipleChoice, this.value, this.checked);
-            });
-
-            let label = document.createElement("label");
-            label.classList.add("form-check-label");
-            label.innerText = question[optionKey];
-
-            optionDiv.appendChild(input);
-            optionDiv.appendChild(label);
-            div.appendChild(optionDiv);
+        input.addEventListener("change", () => {
+            updateUserResponse(question.id, question.multipleChoice, input.value, input.checked);
         });
 
-        reviewContainer.appendChild(div);
+        const label = document.createElement("label");
+        label.classList.add("form-check-label");
+        label.innerText = question[optionKey];
+
+        optionDiv.appendChild(input);
+        optionDiv.appendChild(label);
+        container.appendChild(optionDiv);
     });
-});
+}
 
-// Function to update user responses in localStorage
-function updateUserResponse(questionId, isMultipleChoice, value, isChecked) {
-    let responses = JSON.parse(localStorage.getItem("userResponses") || "{}");
-
-    if (isMultipleChoice) {
-        if (!Array.isArray(responses[questionId])) {
-            responses[questionId] = [];
-        }
+function updateUserResponse(questionId, isMultiple, value, isChecked) {
+    if (isMultiple) {
+        userResponses[questionId] = userResponses[questionId] || [];
         if (isChecked) {
-            if (!responses[questionId].includes(value)) {
-                responses[questionId].push(value);
+            if (!userResponses[questionId].includes(value)) {
+                userResponses[questionId].push(value);
             }
         } else {
-            responses[questionId] = responses[questionId].filter(ans => ans !== value);
+            userResponses[questionId] = userResponses[questionId].filter(v => v !== value);
         }
     } else {
-        responses[questionId] = value;
+        userResponses[questionId] = value;
     }
 
-    localStorage.setItem("userResponses", JSON.stringify(responses));
+    localStorage.setItem("userResponses", JSON.stringify(userResponses));
 }
 
-// Function to go back to the quiz and restore the last viewed question
-function backToQuiz() {
-    const savedQuestions = localStorage.getItem("quizQuestions");
+function setupButtons() {
+    const backBtn = document.querySelector(".btn-secondary");
+    const nextBtn = document.querySelector(".btn-primary");
 
-    if (savedQuestions != null) {
-        // fallback to previously stored currentQuestionIndex in localStorage
-        const lastIndex = localStorage.getItem("currentQuestionIndex") || 0;
-        localStorage.setItem("redirectToQuestion", lastIndex);
-		//alert(lastIndex)
-        window.location.href = "quiz.html";
+    backBtn.addEventListener("click", previousReviewQuestion);
+    nextBtn.addEventListener("click", nextReviewQuestion);
+}
+
+function nextReviewQuestion() {
+    if (currentReviewIndex < filteredQuestions.length - 1) {
+        currentReviewIndex++;
+        showReviewQuestion();
+    }
+}
+
+function previousReviewQuestion() {
+    if (currentReviewIndex > 0) {
+        currentReviewIndex--;
+        showReviewQuestion();
     } else {
-        alert("Unable to restore your previous quiz. Please restart.");
+        const lastQuizIndex = localStorage.getItem("redirectToQuestion") || "0";
+        localStorage.setItem("redirectToQuestion", lastQuizIndex);
+        window.location.href = "quiz.html";
     }
 }
 
+function setupSwitchFilters() {
+    document.getElementById("markedSwitch").addEventListener("change", applyFilters);
+    document.getElementById("unansweredSwitch").addEventListener("change", applyFilters);
+}
 
-// Function to submit the quiz
 function submitQuiz() {
-    let userId = localStorage.getItem("userId") || "guest"; // Use a default value if userId is missing
-    let responses = JSON.parse(localStorage.getItem("userResponses") || "{}");
-	
-		localStorage.removeItem("quizQuestions");
-	    localStorage.removeItem("redirectToQuestion");
-	    localStorage.removeItem("userResponses");
-	    localStorage.removeItem("reviewQuestions");
-	    localStorage.removeItem("currentQuestionIndex");
-	    localStorage.setItem("testStarted", "false");
+    Swal.fire({
+        title: "Are you sure?",
+        text: "Do you want to submit your answers?",
+        icon: "warning",
+        showCancelButton: true,
+        confirmButtonText: "Yes, submit it!",
+        cancelButtonText: "Cancel"
+    }).then((result) => {
+        if (result.isConfirmed) {
+            localStorage.setItem("userResponses", JSON.stringify(userResponses));
+            let userId = localStorage.getItem("userId") || "guest";
+            let responses = JSON.parse(localStorage.getItem("userResponses") || "{}");
 
-    console.log("Submitting responses:", responses);
-	// Clear question set so next quiz is fresh
-   localStorage.removeItem("questions");
-   localStorage.setItem("testStarted", "false");
+            localStorage.removeItem("quizQuestions");
+            localStorage.removeItem("redirectToQuestion");
+            localStorage.removeItem("userResponses");
+            localStorage.removeItem("reviewQuestions");
+            localStorage.removeItem("currentQuestionIndex");
+            localStorage.removeItem("questions");
+            localStorage.setItem("testStarted", "false");
 
-    fetch("/quiz/submit", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ userId: userId, responses: responses })
-    })
-    .then(response => response.text())
-    .then(data => {
-        console.log("Server Response:", data);
-        Swal.fire({
-            title: "Success!",
-            text: "Your quiz has been submitted successfully!",
-            icon: "success",
-            confirmButtonText: "OK"
-        }).then(() => {
-            window.location.href = "index.html";
-        });
-    })
-    .catch(error => {
-        console.error("Error submitting quiz:", error);
-        Swal.fire({
-            title: "Error!",
-            text: "There was an issue submitting your quiz. Please try again.",
-            icon: "error",
-            confirmButtonText: "OK"
-        });
+            fetch("/quiz/submit", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ userId: userId, responses: responses })
+            })
+            .then(response => response.text())
+            .then(data => {
+                Swal.fire({
+                    title: "Success!",
+                    text: "Your quiz has been submitted successfully!",
+                    icon: "success",
+                    confirmButtonText: "OK"
+                }).then(() => {
+                    window.location.href = "index.html";
+                });
+            })
+            .catch(error => {
+                Swal.fire({
+                    title: "Error!",
+                    text: "There was an issue submitting your quiz. Please try again.",
+                    icon: "error",
+                    confirmButtonText: "OK"
+                });
+            });
+        }
     });
 }
